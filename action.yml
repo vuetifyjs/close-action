@@ -1,0 +1,9 @@
+name: 'Close'
+description: "Close mentioned issues"
+inputs:
+  token:
+    description: 'Github token'
+    required: true
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
