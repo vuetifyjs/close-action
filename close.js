@@ -26,11 +26,15 @@ const closeRegexp = /(?:(?:close|resolve)[ds]?|fix(?:e[ds])?) #(\d+)/gi
 
     await Promise.all(
       issues.map(async issueNumber => {
-        return octokit.rest.issues.update({
-          ...context.repo,
-          issue_number: issueNumber,
-          state: 'closed',
-        })
+        try {
+          await octokit.rest.issues.update({
+            ...context.repo,
+            issue_number: issueNumber,
+            state: 'closed',
+          })
+        } catch (err) {
+          core.warning(`Issue #${issueNumber} - ${err.message}`)
+        }
       })
     )
   }
