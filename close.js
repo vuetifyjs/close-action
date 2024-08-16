@@ -9,33 +9,30 @@ const octokit = github.getOctokit(token)
 const closeRegexp = /(?:(?:close|resolve)[ds]?|fix(?:e[ds])?) #(\d+)/gi
 
 ;(async function run() {
-  if (context.eventName === 'push') {
-    const issues = Array.from(new Set(
-      (await Promise.all(
-        context.payload.commits.map(async commit => {
-          if (!commit.distinct) return
+  if (github.context.eventName === 'push') {
+    /** @type {import('@octokit/webhooks-definitions/schema').PushEvent} */
+    const payload = github.context.payload
 
-          return [...commit.message.matchAll(closeRegexp)].map(match => +match[1])
-        })
-      )).flat().filter(v => v != null)
-    ))
-
-    if (!issues.length) return
-
-    core.notice(`Closing issue${issues.length > 1 ? 's' : ''} ${issues.map(v => `#${v}`).join(', ')}`)
-
-    await Promise.all(
-      issues.map(async issueNumber => {
-        try {
-          await octokit.rest.issues.update({
-            ...context.repo,
-            issue_number: issueNumber,
-            state: 'closed',
-          })
-        } catch (err) {
+    for (const commit of payload.commits) {
+      if (!commit.distinct) continue
+      const taggedIssues = [...commit.message.matchAll(closeRegexp)].map(match => +match[1])
+      for (const issueNumber of taggedIssues) {
+        core.notice(`Closing issue #${issueNumber}`)
+        await octokit.rest.issues.update({
+          ...context.repo,
+          issue_number: issueNumber,
+          state: 'closed',
+        }).catch(err => {
           core.warning(`Issue #${issueNumber} - ${err.message}`)
-        }
-      })
-    )
+        })
+        await octokit.rest.issues.addAssignees({
+          ...context.repo,
+          issue_number: issueNumber,
+          assignees: [commit.author.username]
+        }).catch(err => {
+          core.warning(`Issue #${issueNumber} - ${err.message}`)
+        })
+      }
+    }
   }
 })()
